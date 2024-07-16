@@ -9,6 +9,7 @@ export interface CustomDataEntity {
     dataDiaria?: string; //Esse parametro só é necessário se o usuário desejar os dados diários de todas as estações automaticas de um determinado dia
     hora?: string; //Esse parametro só é necessário se o usuário desejar os dados horários de todas as estações automaticas de um determinado dia
     token: string; //Token de acesso da API
+    frequencia: Frequencia
 
 
 }
