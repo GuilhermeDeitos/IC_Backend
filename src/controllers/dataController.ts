@@ -1,4 +1,3 @@
-import { DataAPIEntity } from "../entities/dataAPIEntity";
 import { CustomDataEntity } from "../entities/customDataEntity"
 import dotenv from 'dotenv'
 dotenv.config()
@@ -10,9 +9,15 @@ export class Api{
     }
 
     //Request na API
-    async getApi() {
-        const response = await fetch(this.url)
-        return await response.json()
+    async get() {
+        try{
+            const response = await fetch(this.url)
+            return await response.json()
+        }
+        catch(err){
+            return err
+        }
+        
     }
 }
 
