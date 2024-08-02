@@ -9,4 +9,4 @@ export interface CustomDataEntity {
 }
 
 //namespace com 4 opcoes de string: hora, diario, semanal, mensal
-export type Frequencia = "hora" | "diario" | "semanal" | "mensal"
+export type Frequencia = "horario" | "diario" | "semanal" | "mensal"

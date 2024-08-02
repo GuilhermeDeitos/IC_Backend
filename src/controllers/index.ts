@@ -13,10 +13,11 @@ router.post("/api/interval/", async (req, res) => {
     if (dadosApi.data.length > 0) {
       res.status(200).json(dadosApi);
     } else {
-      res.status(404).json({ message: "Dados não encontrados" });
+      res.status(404).json({ data:dadosApi.data, message: "Dados não encontrados" });
     }
   } catch (err) {
-    res.status(500).json({ message: "Erro de servidor" });
+  
+    res.status(500).json({ message: "Erro de servidor", erro: err});
   }
 });
 
