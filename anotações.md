@@ -1,14 +1,13 @@
 Granularidade
-- Os instantaneos tratar como média 
-- Checar tabela de granularidade alguns
+- Os instantaneos tratar como média - feito
+- Checar tabela de granularidade alguns - feito
 
-- Rajada: Média do dia/mês
-- Chuva: Soma do dia/mes
-- Pto de orvalho tratar igual os demais
-- Radiação: Média do dia (apenas não somar o que não tiver null)
+- Chuva: Soma do dia/mes - feito
+- Pto de orvalho tratar igual os demais - feito
+- Radiação: Soma do dia (apenas não somar o que não tiver null) - feito
     - Cuidar com radiação negativa
 
-- Retirar:
+- Retirar: - feito
     - Direção do vento
     - TEM_CPU
     - TEM_SEN
