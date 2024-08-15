@@ -27,4 +27,5 @@ export interface DataAPIEntity {
     CD_ESTACAO: string;
     HR_MEDICAO?: string;
     TEM_MED?: number | string;
+    num_dias?: number | string;
 }

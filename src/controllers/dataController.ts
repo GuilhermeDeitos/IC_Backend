@@ -14,7 +14,6 @@ export class Api {
   private data: Data;
   private codigoEstacao: string;
   constructor(params: CustomDataEntity) {
-    //Apenas uma URL teste, não trabalhando ainda com os parametros dadosDiarios, dadosHorarios e estacaoAutomatica
     this.data = {
       dataInicio: params.dataInicio,
       dataFinal: params.dataFinal,
@@ -24,37 +23,22 @@ export class Api {
     this.url = `http://apitempo.inmet.gov.br/token/estacao/${params.dataInicio}/${params.dataFinal}/${params.codigoEstacao}/${process.env.TOKEN_API}`;
   }
 
-  //Request na API do INMET
-  /*
-        Após realizar alguns testes foi percebido que ele só permite fazer requisições de um periodo maximo de 1 ano e 1 dia
-    
-    */
-
-  private atualizarValoresMaxMin(
+  private atualizarValoresMaxMin( //Faz a atribuição a partir do parametro "minOrMax", caso min, salva o menor valor, caso max, salva o maior valor
     valorAtual: DataAPIEntity,
     chave: keyof DataAPIEntity,
     valorAnterior: DataAPIEntity,
-    minOrMax: string
+    minOrMax: "min" | "max"
   ) {
-    switch (minOrMax) {
-      case "min":
-        if (
-          Number(valorAtual[chave]) < Number(valorAnterior[chave]) &&
-          valorAtual[chave] !== null
-        ) {
-          valorAnterior[chave] = valorAtual[chave] as any;
-        }
-        break;
-      case "max":
-        if (
-          Number(valorAtual[chave]) > Number(valorAnterior[chave]) &&
-          valorAtual[chave] !== null
-        ) {
-          valorAnterior[chave] = valorAtual[chave] as any;
-        }
-        break;
+    const atual = Number(valorAtual[chave]);
+    const anterior = Number(valorAnterior[chave]);
+  
+    if (valorAtual[chave] !== null && 
+        ((minOrMax === "min" && atual < anterior) || 
+         (minOrMax === "max" && atual > anterior))) {
+      valorAnterior[chave] = valorAtual[chave] as any;
     }
   }
+  
 
   // Função auxiliar para calcular a média e converter para string
   private calcularMedia(
@@ -66,7 +50,7 @@ export class Api {
     objeto[chave] = (Number(objSoma[chave] as any) / divisor).toFixed(2); // toFixed(2) para limitar a duas casas decimais
   }
 
-  //Função auxiliar para fazer a requisição da API, converter para JSON e retirar os valores que não são necessários
+  //Função auxiliar para fazer a requisição da API, converter para JSON e retirar os campos que não são necessários
   private async fetchApi(): Promise<DataAPIEntity[]> {
     return await fetch(this.url)
       .then((response) => response.json())
@@ -92,11 +76,11 @@ export class Api {
     const datas: Data[] = [];
     const dataInicio = new Date(dataInicioOriginal.getTime());
 
-    while (dataInicio.getTime() < dataFinalOriginal.getTime()) {
+    while (dataInicio.getTime() < dataFinalOriginal.getTime()) { 
       const dataFinal =
         new Date(dataInicio.getTime() + 31536000000) > dataFinalOriginal
-          ? dataFinalOriginal
-          : new Date(dataInicio.getTime() + 31536000000);
+          ? dataFinalOriginal 
+          : new Date(dataInicio.getTime() + 31536000000); //Esse valor é o valor para 1 ano e 1 dia 
       datas.push({
         dataInicio: dataInicio.toISOString().split("T")[0],
         dataFinal: dataFinal.toISOString().split("T")[0],
@@ -104,7 +88,7 @@ export class Api {
       dataInicio.setTime(dataFinal.getTime());
     }
 
-    const response = await Promise.all(
+    const response = await Promise.all( //Faz as requisições para todas as datas
       datas.map(async (data) => {
         const url = `http://apitempo.inmet.gov.br/token/estacao/${data.dataInicio}/${data.dataFinal}/${this.codigoEstacao}/${process.env.TOKEN_API}`;
         const response = await fetch(url);
@@ -112,7 +96,6 @@ export class Api {
       })
     );
 
-    console.log(typeof response);
 
     //Juntar os arrays de dados
     const dadosAcumulados = response.reduce((acc, cur) => {
@@ -123,147 +106,143 @@ export class Api {
   }
 
   private tratarInstantaneos(response: any): DataAPIEntity[] {
-    return this.separarDias(this.frequencia, response)
-      .map((dia: DataAPIEntity[]) => {
-        /*
-        Para cada grupo de dados, faremos um tratamento,
-        - Para as medidas com MAX e MIN, vamos pegar a maior e menor do dia
-        - Os INS vamos tratar como média
-        - Para as medidas de chuva, vamos somar
-        - RAD_GLO vamos tirar a média do dia (só dos valores diferentes de null e maiores que 0)
-
-      */
-        //Inicializando o objeto que vai armazenar os dados filtrados
-        const accumuledData: DataAPIEntity[] = [];
-        let somarData: Record<string, number> = {
-          PTO_INS: 0,
-          UMD_INS: 0,
-          TEM_INS: 0,
-          PRE_INS: 0,
-          RAD_GLO: 0,
-          CHUVA: 0,
-          VEN_VEL: 0,
-        };
-        let contRad = 0;
-        for (let i = 0; i < dia.length; i++) {
-          //Percorrendo o vetor dia
-          if (i === 0) {
-            accumuledData.push(dia[i]); //Adicionando o primeiro valor para inicializar
-          } else {
-            //Para as medidas de MAX e MIN
-            [
-              "PRE_MAX",
-              "PRE_MIN",
-              "TEM_MAX",
-              "TEM_MIN",
-              "UMD_MAX",
-              "UMD_MIN",
-              "PTO_MAX",
-              "PTO_MIN",
-            ].forEach((key: string) => {
-              if (key.includes("MAX"))
-                this.atualizarValoresMaxMin(
-                  dia[i],
-                  key as keyof DataAPIEntity,
-                  accumuledData[0],
-                  "max"
-                );
-              else if (key.includes("MIN"))
-                this.atualizarValoresMaxMin(
-                  dia[i],
-                  key as keyof DataAPIEntity,
-                  accumuledData[0],
-                  "min"
-                );
-            });
-
-            
-          }
-          //Para as medidas de INS
-          somarData["PTO_INS"] += Number(dia[i]["PTO_INS"]);
-          somarData["UMD_INS"] += Number(dia[i]["UMD_INS"]);
-          somarData["TEM_INS"] += Number(dia[i]["TEM_INS"]);
-          somarData["PRE_INS"] += Number(dia[i]["PRE_INS"]);
-          somarData["VEN_VEL"] += Number(dia[i]["VEN_VEL"]);
-
-          //Para as medidas de chuva
-          somarData["CHUVA"] += Number(dia[i]["CHUVA"]);
-
-          //Para as medidas de RAD_GLO
-          if (dia[i]["RAD_GLO"] !== null && Number(dia[i]["RAD_GLO"]) > 0) {
-            somarData["RAD_GLO"] += Number(dia[i]["RAD_GLO"]);
-            contRad++;
-          }
-        }
-
-        //Calculando a média dos INS
-        this.calcularMedia(accumuledData[0], "PTO_INS", somarData, dia.length);
-        this.calcularMedia(accumuledData[0], "UMD_INS", somarData, dia.length);
-        this.calcularMedia(accumuledData[0], "TEM_INS", somarData, dia.length);
-        this.calcularMedia(accumuledData[0], "PRE_INS", somarData, dia.length);
-        this.calcularMedia(accumuledData[0], "RAD_GLO", somarData, contRad);
-        this.calcularMedia(accumuledData[0], "VEN_VEL", somarData, dia.length);
-
-        //Adicionando os valores de somarData
-        accumuledData[0]["CHUVA"] = Number(somarData["CHUVA"]).toFixed(2);
-        accumuledData[0]["TEM_MED"] = (Number(accumuledData[0]["TEM_MAX"]) + Number(accumuledData[0]["TEM_MIN"])) / 2;
-        delete accumuledData[0]["HR_MEDICAO"];
-        return accumuledData;
-      })
-      .reduce((acc, cur) => {
-        return acc.concat(cur);
-      }, []);
+    return this.separarDias(this.frequencia, response) //Organiza os dados da resposta (1 obj para cada hora) em dias/semana/mes (varia da frequencia), retornando um vetor de vetores em q cada item é um vetor que concatena 24 itens (24 horas)
+      .map((dia: DataAPIEntity[]) => this.processarDia(dia)) //Percorre vetor por vetor para fazermos os tratamentos
+      .reduce((acc, cur) => acc.concat(cur), []); //Juntamos tudo novamente
   }
 
-  private separarDias(frequencia: string, response: any): DataAPIEntity[][] {
+  private processarDia(dia: DataAPIEntity[]): DataAPIEntity[] {
+    const acumulado = this.inicializarAcumulado(dia[0]); //Apenas para termos valores para comparar em alguns tratamentos
+    const somas = this.inicializarSomas(); //Campos que somam dados
+    let contadorRadGlo = 0; //contador de valores de radiação positiva para divisão posterior
+    let ultimoDia = ""; 
+
+    dia.forEach((medicao:DataAPIEntity, index:number) => { //Percorrendo cada dia (24 vetores, 1 para cada hora)
+      if (index === dia.length - 1) {
+        ultimoDia = medicao["DT_MEDICAO"]; //Apenas para concatenar no DT_MEDIÇÂO no fim
+      }
+
+      this.atualizaValoresMaxMin(medicao, acumulado); //Método auxiliar para atualizar valores maximos e minimos
+      this.somarValores(medicao, somas); //Metodo auxiliar para soma
+
+      if (medicao["RAD_GLO"] !== null && Number(medicao["RAD_GLO"]) > 0) { //Tratamento da radiação
+        somas["RAD_GLO"] += Number(medicao["RAD_GLO"]);
+        contadorRadGlo++;
+      }
+    });
+
+    this.calcularMedias(acumulado, somas, dia.length, contadorRadGlo); //Metodo auxiliar que retorna as médias dos valores instantaneos
+
+    acumulado["CHUVA"] = somas["CHUVA"].toFixed(2); 
+    acumulado["TEM_MED"] = (
+      (Number(acumulado["TEM_MAX"]) + Number(acumulado["TEM_MIN"])) /
+      2
+    ).toFixed(2);
+    acumulado["num_dias"] = dia.length / 24;
+    acumulado["DT_MEDICAO"] += ` ${ultimoDia}`;
+
+    delete acumulado["HR_MEDICAO"];
+
+    return [acumulado];
+  }
+
+  private inicializarAcumulado(primeiroRegistro: DataAPIEntity): DataAPIEntity { //Apenas retorna um objeto inicializado
+    return { ...primeiroRegistro };
+  }
+
+  private inicializarSomas(): Record<string, number> { //Retorna um objeto com os campos que serão somados
+    return {
+      PTO_INS: 0,
+      UMD_INS: 0,
+      TEM_INS: 0,
+      PRE_INS: 0,
+      RAD_GLO: 0,
+      CHUVA: 0,
+      VEN_VEL: 0,
+    };
+  }
+
+  private atualizaValoresMaxMin( 
+    medicao: DataAPIEntity,
+    acumulado: DataAPIEntity
+  ) { //Separa quais campos calcularão o maximo e minimo, e com isso chama a função de atualização
+    const camposMaxMin: Record<string, "min" | "max"> = {
+      PRE_MAX: "max",
+      PRE_MIN: "min",
+      TEM_MAX: "max",
+      TEM_MIN: "min",
+      UMD_MAX: "max",
+      UMD_MIN: "min",
+      PTO_MAX: "max",
+      PTO_MIN: "min",
+    };
+
+    Object.keys(camposMaxMin).forEach((chave) => {
+      this.atualizarValoresMaxMin(
+        medicao,
+        chave as keyof DataAPIEntity,
+        acumulado,
+        camposMaxMin[chave]
+      );
+    });
+  }
+
+  private somarValores(medicao: DataAPIEntity, somas: Record<string, number>) { //Apenas soma os valores necessários
+    somas["PTO_INS"] += Number(medicao["PTO_INS"]);
+    somas["UMD_INS"] += Number(medicao["UMD_INS"]);
+    somas["TEM_INS"] += Number(medicao["TEM_INS"]);
+    somas["PRE_INS"] += Number(medicao["PRE_INS"]);
+    somas["VEN_VEL"] += Number(medicao["VEN_VEL"]);
+    somas["CHUVA"] += Number(medicao["CHUVA"]);
+  }
+
+  private calcularMedias(
+    acumulado: DataAPIEntity,
+    somas: Record<string, number>,
+    totalDias: number,
+    contadorRadGlo: number
+  ) { //Método auxiliar para indicar o calculo da média dos valores necessários 
+    this.calcularMedia(acumulado, "PTO_INS", somas, totalDias);
+    this.calcularMedia(acumulado, "UMD_INS", somas, totalDias);
+    this.calcularMedia(acumulado, "TEM_INS", somas, totalDias);
+    this.calcularMedia(acumulado, "PRE_INS", somas, totalDias);
+    this.calcularMedia(acumulado, "RAD_GLO", somas, contadorRadGlo);
+    this.calcularMedia(acumulado, "VEN_VEL", somas, totalDias);
+  }
+
+  private separarDias(frequencia: string, response: DataAPIEntity[]): DataAPIEntity[][] {
     const dias: DataAPIEntity[][] = [];
-    const modDias: number =
-      frequencia === "diario"
-        ? 24
-        : frequencia === "semanal"
-        ? 24 * 7
-        : 24 * 30;
-    /*
-          Fazer um acumulo com os dados de cada dia
-          É utilizando "HR_MEDICAO" para identificar os dados de um mesmo dia, vai de 0000, 0100, ..., 2300
-        */
-    for (let i = 0; i < response.length; i++) {
-      if (i === 0) {
-        dias.push([response[i]]);
-      } else if (i % modDias === 0) {
-        dias.push([response[i]]);
-      } else {
-        dias[dias.length - 1].push(response[i]);
-      }
-    }
-    //Verificar se tem dias restando
-    const ultimoDia = dias[dias.length - 1][0]["DT_MEDICAO"];
-    const ultimoDiaResponse = response[response.length - 1]["DT_MEDICAO"];
-    console.log(ultimoDia, ultimoDiaResponse)
-    if (ultimoDia !== ultimoDiaResponse) {
-      const diff = this.calcularDiferencaDias(ultimoDia, ultimoDiaResponse);
-      console.log(diff)
-      dias.push([response[response.length - 1]]);
-      for (let i = 0; i < diff; i++) {
-        dias[dias.length - 1].push(response[response.length - 1 - i]);
-      }
-      console.log(dias)
-    }
-    return dias;
-  }
+    const modDias = 24; // Juntar os dados de 24 em 24 horas para formar um dia
 
-  private calcularDiferencaDias(data1: string, data2: string): number {
-    const date1 = new Date(data1);
-    const date2 = new Date(data2);
-  
-    // Calcula a diferença em milissegundos
-    const diffTime = Math.abs(date2.getTime() - date1.getTime());
-  
-    // Converte a diferença de milissegundos para dias
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-    return diffDays;
-  }
+    // Agrupar os dados por dia
+    response.forEach((medicao, index) => {
+        if (index % modDias === 0) {
+            dias.push([medicao]);
+        } else {
+            dias[dias.length - 1].push(medicao);
+        }
+    });
+
+    // Função auxiliar para agrupar os dias em semanas ou meses
+    const agruparPeriodos = (intervalo: number): DataAPIEntity[][] => {
+        const periodos: DataAPIEntity[][] = [];
+        for (let i = 0; i < dias.length; i += intervalo) {
+            periodos.push(dias.slice(i, i + intervalo).flat());
+        }
+        return periodos;
+    };
+
+    // Agrupar conforme a frequência
+    switch (frequencia) {
+        case "semanal":
+            return agruparPeriodos(7);
+        case "mensal":
+            return agruparPeriodos(30);
+        default:
+            return dias;
+    }
+}
+
 
   async get() {
     try {
