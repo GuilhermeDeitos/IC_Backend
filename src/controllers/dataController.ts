@@ -91,10 +91,22 @@ export class Api {
     const response = await Promise.all( //Faz as requisições para todas as datas
       datas.map(async (data) => {
         const url = `http://apitempo.inmet.gov.br/token/estacao/${data.dataInicio}/${data.dataFinal}/${this.codigoEstacao}/${process.env.TOKEN_API}`;
-        const response = await fetch(url);
-        return await response.json();
+        return await fetch(url)
+        .then(response => response.json())
+        .then((data) => {
+          return data.map((dado: DataAPIEntity) => {
+            //Retirar os campos desnecessários "TEM_CPU", "TEM_SEN", "TEN_BAT", "VEN_RAJ", "VEN_DIR"
+            ["TEM_CPU", "TEM_SEN", "TEN_BAT", "VEN_RAJ", "VEN_DIR"].forEach(
+              (key: string) => {
+                delete dado[key as keyof DataAPIEntity];
+              }
+            );
+  
+            return dado;
+          });
       })
-    );
+    })
+  )
 
 
     //Juntar os arrays de dados

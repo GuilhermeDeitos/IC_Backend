@@ -7,13 +7,14 @@ Granularidade
 - Radiação: Soma do dia (apenas não somar o que não tiver null) - feito
     - Cuidar com radiação negativa
 
-- Retirar: - feito
+- Retirar: - corrigir para periodos maiores de 1 ano
     - Direção do vento
     - TEM_CPU
     - TEM_SEN
     - TEN_BAT
     - Rajada do vento
-    
+
+
 - Mandar email pedindo sobre:
     - Tempo de uso/vencimento do token 
     - Tem um manual das variaveis retornadas pela API?
